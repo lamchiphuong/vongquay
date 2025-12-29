@@ -271,10 +271,7 @@
 </head>
 <body>
     <!-- Âm thanh -->
-    <!-- Nhạc nền căng thẳng khi quay (building suspense, loop tốt) -->
     <audio id="spin-music" src="https://cdn.pixabay.com/audio/2022/03/15/audio_c0cc300029.mp3" preload="auto" loop></audio>
-    
-    <!-- Âm thanh công bố winner hoành tráng -->
     <audio id="win-sound" src="https://cdn.pixabay.com/audio/2025/09/13/audio_fc02fd4274.mp3" preload="auto"></audio>
 
     <div class="container">
@@ -395,8 +392,10 @@
 
         function updateButtons() {
             const hasStudents = students.length > 0;
+            const hasActive = getActiveStudents().length >= 2;
             restartBtn.disabled = !hasStudents;
             resetBtn.disabled = !hasStudents;
+            spinBtn.disabled = !hasActive;  // Chỉ bật khi có ít nhất 2 người chơi
         }
 
         function addStudent() {
@@ -444,6 +443,7 @@
                 `;
                 studentGrid.appendChild(item);
             });
+            updateButtons(); // Cập nhật lại trạng thái nút sau khi render
         }
 
         function getSpinDuration() {
@@ -470,7 +470,6 @@
 
             document.querySelectorAll('.student-item').forEach(el => el.classList.remove('highlight'));
 
-            // Bắt đầu phát nhạc nền căng thẳng
             spinMusic.currentTime = 0;
             spinMusic.play().catch(() => {});
 
@@ -503,22 +502,21 @@
 
                 if (step >= totalSteps) {
                     clearInterval(highlightInterval);
+                    highlightInterval = null;
                     if (item) item.classList.add('highlight');
 
-                    // Dừng nhạc nền căng thẳng
                     spinMusic.pause();
 
                     winnerName.textContent = winner.name;
                     winnerPhoto.src = winner.photo;
 
-                    // Phát fanfare chúc mừng
                     winSound.currentTime = 0;
                     winSound.play().catch(() => {});
 
                     resultModal.style.display = 'flex';
 
                     spinning = false;
-                    spinBtn.disabled = false;
+                    updateButtons(); // Cập nhật lại nút quay sau khi kết thúc
                 }
             }, 80);
         }
@@ -569,6 +567,16 @@
                     students = [];
                     renderGrid();
                     localStorage.removeItem(STORAGE_KEY);
+
+                    // Reset hoàn toàn trạng thái quay để tránh bug
+                    spinning = false;
+                    if (highlightInterval) {
+                        clearInterval(highlightInterval);
+                        highlightInterval = null;
+                    }
+                    document.querySelectorAll('.student-item').forEach(el => el.classList.remove('highlight'));
+                    spinBtn.disabled = true; // Sẽ được bật lại khi thêm đủ người
+
                     updateButtons();
                     showAlert('Đã xóa toàn bộ danh sách thành công!<br>Bây giờ bạn có thể thêm danh sách mới.');
                 }
