@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vòng Quay May Mắn - Chọn Ngẫu Nhiên</title>
     
-    <!-- FAVICON - Icon tab trình duyệt -->
+    <!-- FAVICON -->
     <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
     <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/8258/8258910.png">
 
@@ -333,7 +333,7 @@
         </div>
     </div>
 
-    <!-- Modal kết quả người thắng -->
+    <!-- Modal kết quả -->
     <div id="result-modal" class="modal">
         <div class="modal-content">
             <h2>🎉 Chúc mừng! 🎉</h2>
@@ -346,7 +346,7 @@
         </div>
     </div>
 
-    <!-- Modal thông báo chung -->
+    <!-- Modal thông báo -->
     <div id="alert-modal" class="modal">
         <div class="modal-content">
             <h3 id="alert-title">Thông báo</h3>
@@ -360,8 +360,6 @@
     </div>
 
     <script>
-        // ... (toàn bộ phần script giống hệt phiên bản trước, mình giữ nguyên để tránh lỗi) ...
-
         const studentGrid = document.getElementById('student-grid');
         const resultModal = document.getElementById('result-modal');
         const alertModal = document.getElementById('alert-modal');
@@ -400,14 +398,6 @@
                 hash = name.charCodeAt(i) + ((hash << 5) - hash);
             }
             return avatarColors[Math.abs(hash % avatarColors.length)];
-        }
-
-        function createAvatarElement(name, avatarClass) {
-            const div = document.createElement('div');
-            div.className = avatarClass;
-            div.textContent = getInitial(name);
-            div.style.backgroundColor = getAvatarColor(name);
-            return div;
         }
 
         function showAlert(message, title = "Thông báo") {
@@ -472,13 +462,18 @@
                 return;
             }
 
+            // Kiểm tra trùng tên (giúp tránh nhầm lẫn)
+            if (students.some(s => s.name === name)) {
+                showAlert('Tên này đã tồn tại trong danh sách!');
+                return;
+            }
+
             const add = (photoDataURL = null) => {
-                const student = { 
+                students.push({ 
                     name, 
                     photo: photoDataURL,
                     excluded: false
-                };
-                students.push(student);
+                });
                 renderGrid();
                 saveList();
                 updateButtons();
@@ -503,26 +498,36 @@
 
         function renderGrid() {
             studentGrid.innerHTML = '';
-            const activeStudents = getActiveStudents();
-            activeStudents.forEach((student) => {
-                const realIndex = students.indexOf(student);
+
+            students.forEach((student, realIndex) => {
+                if (student.excluded) return;
+
                 const item = document.createElement('div');
                 item.className = 'student-item';
                 item.dataset.realIndex = realIndex;
 
+                let avatarHTML = '';
+
                 if (student.photo) {
-                    item.innerHTML = `
-                        <img class="grid-photo" src="${student.photo}" alt="${student.name}">
-                        <div class="name">${student.name}</div>
-                    `;
+                    avatarHTML = `<img class="grid-photo" src="${student.photo}" alt="${student.name}">`;
                 } else {
-                    const avatar = createAvatarElement(student.name, 'grid-text-avatar');
-                    item.innerHTML = `<div class="name">${student.name}</div>`;
-                    item.insertBefore(avatar, item.firstChild);
+                    const color = getAvatarColor(student.name);
+                    const initial = getInitial(student.name);
+                    avatarHTML = `
+                        <div class="grid-text-avatar" style="background-color: ${color}">
+                            ${initial}
+                        </div>
+                    `;
                 }
+
+                item.innerHTML = `
+                    ${avatarHTML}
+                    <div class="name">${student.name}</div>
+                `;
 
                 studentGrid.appendChild(item);
             });
+
             updateButtons();
         }
 
@@ -535,7 +540,12 @@
                 img.className = 'winner-photo';
                 winnerAvatarContainer.appendChild(img);
             } else {
-                const avatar = createAvatarElement(student.name, 'winner-avatar');
+                const color = getAvatarColor(student.name);
+                const initial = getInitial(student.name);
+                const avatar = document.createElement('div');
+                avatar.className = 'winner-avatar';
+                avatar.style.backgroundColor = color;
+                avatar.textContent = initial;
                 winnerAvatarContainer.appendChild(avatar);
             }
         }
@@ -573,7 +583,7 @@
 
             const winnerActiveIndex = Math.floor(Math.random() * activeStudents.length);
             const winner = activeStudents[winnerActiveIndex];
-            lastWinnerIndex = students.indexOf(winner);
+            lastWinnerIndex = students.indexOf(winner); // vẫn dùng được vì object reference còn trong mảng
 
             highlightInterval = setInterval(() => {
                 document.querySelectorAll('.student-item').forEach(el => el.classList.remove('highlight'));
@@ -684,7 +694,7 @@
         window.onclick = event => {
             if (event.target === resultModal) closeModal();
             if (event.target === alertModal) closeAlert();
-        }
+        };
     </script>
 </body>
 </html>
