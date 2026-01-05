@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vòng Quay May Mắn - Chọn Ngẫu Nhiên</title>
     
-    <!-- FAVICON -->
     <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
     <link rel="shortcut icon" href="https://cdn-icons-png.flaticon.com/512/8258/8258910.png">
 
@@ -22,7 +21,7 @@
         }
 
         .container {
-            max-width: 1100px;
+            max-width: 1200px;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
@@ -82,18 +81,13 @@
         }
 
         .student-grid {
-            padding: 30px;
+            padding: 20px 30px;
             display: grid;
-            grid-template-columns: repeat(10, 1fr);
-            gap: 20px;
-        }
-
-        @media (max-width: 767px) {
-            .student-grid {
-                grid-template-columns: repeat(4, 1fr);
-                gap: 15px;
-                padding: 20px;
-            }
+            grid-template-columns: repeat(10, minmax(90px, 1fr));
+            gap: 16px 20px;
+            justify-items: center;
+            align-content: start;
+            min-height: 200px;
         }
 
         .student-item {
@@ -303,10 +297,63 @@
             from { transform: scale(0.4); opacity: 0; }
             to { transform: scale(1); opacity: 1; }
         }
+
+        /* Responsive */
+        @media (min-width: 1025px) {
+            .student-grid {
+                grid-template-columns: repeat(10, minmax(90px, 1fr));
+                gap: 20px;
+                padding: 30px;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .student-grid {
+                grid-template-columns: repeat(8, minmax(85px, 1fr));
+                gap: 16px;
+                padding: 25px;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .student-grid {
+                grid-template-columns: repeat(5, minmax(80px, 1fr));
+                gap: 12px 16px;
+                padding: 20px;
+            }
+            .student-item .grid-photo,
+            .student-item .grid-text-avatar {
+                width: 70px;
+                height: 70px;
+                font-size: 32px;
+                border-width: 4px;
+            }
+            .student-item .name {
+                font-size: 12px;
+                margin-top: 6px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .student-grid {
+                grid-template-columns: repeat(4, minmax(70px, 1fr));
+                gap: 10px 14px;
+                padding: 15px;
+            }
+            .student-item .grid-photo,
+            .student-item .grid-text-avatar {
+                width: 65px;
+                height: 65px;
+                font-size: 28px;
+            }
+            .student-item .name {
+                font-size: 11px;
+            }
+        }
     </style>
 </head>
 <body>
-    <!-- Âm thanh -->
+
     <audio id="spin-music" src="https://cdn.pixabay.com/audio/2022/03/15/audio_c0cc300029.mp3" preload="auto" loop></audio>
     <audio id="win-sound" src="https://cdn.pixabay.com/audio/2025/09/13/audio_fc02fd4274.mp3" preload="auto"></audio>
 
@@ -365,7 +412,6 @@
         const alertModal = document.getElementById('alert-modal');
         const alertTitle = document.getElementById('alert-title');
         const alertMessage = document.getElementById('alert-message');
-
         const winnerName = document.getElementById('winner-name');
         const winnerAvatarContainer = document.getElementById('winner-avatar-container');
         const spinBtn = document.getElementById('spin-btn');
@@ -426,22 +472,29 @@
 
         function confirmAlert() {
             alertModal.style.display = 'none';
-            if (confirmCallback) {
-                confirmCallback();
-                confirmCallback = null;
-            }
+            if (confirmCallback) confirmCallback();
+            confirmCallback = null;
         }
 
         function loadSavedList() {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                students = JSON.parse(saved);
-                renderGrid();
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    students = JSON.parse(saved);
+                    renderGrid();
+                }
+            } catch (e) {
+                console.error("Lỗi load:", e);
+                students = [];
             }
         }
 
         function saveList() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(students));
+            } catch (e) {
+                console.error("Lỗi save:", e);
+            }
         }
 
         function updateButtons() {
@@ -449,7 +502,7 @@
             const hasActive = getActiveStudents().length >= 2;
             restartBtn.disabled = !hasStudents;
             resetBtn.disabled = !hasStudents;
-            spinBtn.disabled = !hasActive;
+            spinBtn.disabled = !hasActive || spinning;
         }
 
         function addStudent() {
@@ -462,33 +515,42 @@
                 return;
             }
 
-            // Kiểm tra trùng tên (giúp tránh nhầm lẫn)
             if (students.some(s => s.name === name)) {
-                showAlert('Tên này đã tồn tại trong danh sách!');
+                showAlert('Tên này đã tồn tại!');
+                nameInput.focus();
                 return;
             }
 
+            const resetInputs = () => {
+                nameInput.value = '';
+                photoInput.value = '';
+                nameInput.focus();
+            };
+
             const add = (photoDataURL = null) => {
-                students.push({ 
-                    name, 
-                    photo: photoDataURL,
-                    excluded: false
-                });
+                students.push({ name, photo: photoDataURL, excluded: false });
                 renderGrid();
                 saveList();
                 updateButtons();
-                nameInput.value = '';
-                photoInput.value = '';
+                resetInputs();
             };
 
-            if (photoInput.files && photoInput.files[0]) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    add(e.target.result);
-                };
-                reader.readAsDataURL(photoInput.files[0]);
-            } else {
-                add(null);
+            try {
+                if (photoInput.files && photoInput.files.length > 0) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => add(e.target.result);
+                    reader.onerror = () => {
+                        showAlert("Không đọc được ảnh, vẫn thêm học sinh.");
+                        add(null);
+                    };
+                    reader.readAsDataURL(photoInput.files[0]);
+                } else {
+                    add(null);
+                }
+            } catch (err) {
+                console.error("Lỗi thêm:", err);
+                showAlert("Có lỗi khi thêm, thử lại nhé!");
+                resetInputs();
             }
         }
 
@@ -498,7 +560,6 @@
 
         function renderGrid() {
             studentGrid.innerHTML = '';
-
             students.forEach((student, realIndex) => {
                 if (student.excluded) return;
 
@@ -506,28 +567,13 @@
                 item.className = 'student-item';
                 item.dataset.realIndex = realIndex;
 
-                let avatarHTML = '';
+                let avatarHTML = student.photo
+                    ? `<img class="grid-photo" src="${student.photo}" alt="${student.name}">`
+                    : `<div class="grid-text-avatar" style="background-color:${getAvatarColor(student.name)}">${getInitial(student.name)}</div>`;
 
-                if (student.photo) {
-                    avatarHTML = `<img class="grid-photo" src="${student.photo}" alt="${student.name}">`;
-                } else {
-                    const color = getAvatarColor(student.name);
-                    const initial = getInitial(student.name);
-                    avatarHTML = `
-                        <div class="grid-text-avatar" style="background-color: ${color}">
-                            ${initial}
-                        </div>
-                    `;
-                }
-
-                item.innerHTML = `
-                    ${avatarHTML}
-                    <div class="name">${student.name}</div>
-                `;
-
+                item.innerHTML = `${avatarHTML}<div class="name">${student.name}</div>`;
                 studentGrid.appendChild(item);
             });
-
             updateButtons();
         }
 
@@ -540,13 +586,11 @@
                 img.className = 'winner-photo';
                 winnerAvatarContainer.appendChild(img);
             } else {
-                const color = getAvatarColor(student.name);
-                const initial = getInitial(student.name);
-                const avatar = document.createElement('div');
-                avatar.className = 'winner-avatar';
-                avatar.style.backgroundColor = color;
-                avatar.textContent = initial;
-                winnerAvatarContainer.appendChild(avatar);
+                const div = document.createElement('div');
+                div.className = 'winner-avatar';
+                div.style.backgroundColor = getAvatarColor(student.name);
+                div.textContent = getInitial(student.name);
+                winnerAvatarContainer.appendChild(div);
             }
         }
 
@@ -561,17 +605,15 @@
         }
 
         function spin() {
-            const activeStudents = getActiveStudents();
-            if (activeStudents.length < 2) {
-                showAlert('Cần ít nhất 2 học sinh chưa bị loại để quay!');
+            if (spinning) return;
+            const active = getActiveStudents();
+            if (active.length < 2) {
+                showAlert('Cần ít nhất 2 học sinh để quay!');
                 return;
             }
-            if (spinning) return;
 
-            saveList();
             spinning = true;
             spinBtn.disabled = true;
-
             document.querySelectorAll('.student-item').forEach(el => el.classList.remove('highlight'));
 
             spinMusic.currentTime = 0;
@@ -581,42 +623,36 @@
             const totalSteps = Math.floor(duration / 80);
             let step = 0;
 
-            const winnerActiveIndex = Math.floor(Math.random() * activeStudents.length);
-            const winner = activeStudents[winnerActiveIndex];
-            lastWinnerIndex = students.indexOf(winner); // vẫn dùng được vì object reference còn trong mảng
+            const winnerActiveIndex = Math.floor(Math.random() * active.length);
+            const winner = active[winnerActiveIndex];
+            lastWinnerIndex = students.findIndex(s => s === winner);
+
+            if (lastWinnerIndex === -1) {
+                spinning = false;
+                spinBtn.disabled = false;
+                return;
+            }
 
             highlightInterval = setInterval(() => {
                 document.querySelectorAll('.student-item').forEach(el => el.classList.remove('highlight'));
 
-                let currentIndex;
-                if (step >= totalSteps - 15) {
-                    currentIndex = winnerActiveIndex;
-                } else {
-                    currentIndex = Math.floor(Math.random() * activeStudents.length);
-                }
-
-                const currentStudent = activeStudents[currentIndex];
-                const realIndex = students.indexOf(currentStudent);
-                const item = document.querySelector(`.student-item[data-real-index="${realIndex}"]`);
-                if (item) {
-                    item.classList.add('highlight');
-                }
+                const idx = (step >= totalSteps - 15) ? winnerActiveIndex : Math.floor(Math.random() * active.length);
+                const curr = active[idx];
+                const realIdx = students.findIndex(s => s === curr);
+                const el = document.querySelector(`.student-item[data-real-index="${realIdx}"]`);
+                if (el) el.classList.add('highlight');
 
                 step++;
-
                 if (step >= totalSteps) {
                     clearInterval(highlightInterval);
                     highlightInterval = null;
-                    if (item) item.classList.add('highlight');
+                    if (el) el.classList.add('highlight');
 
                     spinMusic.pause();
-
                     winnerName.textContent = winner.name;
                     renderWinnerAvatar(winner);
-
                     winSound.currentTime = 0;
                     winSound.play().catch(() => {});
-
                     resultModal.style.display = 'flex';
 
                     spinning = false;
@@ -626,11 +662,10 @@
         }
 
         function excludeWinner() {
-            if (lastWinnerIndex >= 0) {
+            if (lastWinnerIndex >= 0 && students[lastWinnerIndex]) {
                 students[lastWinnerIndex].excluded = true;
                 renderGrid();
                 saveList();
-                lastWinnerIndex = -1;
             }
             closeModal();
         }
@@ -641,59 +676,45 @@
         }
 
         function restartList() {
-            if (students.length === 0) {
-                showAlert('Chưa có danh sách nào để khởi động lại!');
-                return;
-            }
-
+            if (!students.length) return showAlert('Chưa có danh sách!');
             showConfirm(
-                'Bạn có muốn khởi động lại không?<br>Tất cả học sinh sẽ hiện lại và tham gia quay từ đầu.',
+                'Khởi động lại?<br>Tất cả sẽ tham gia quay lại từ đầu.',
                 'Khởi động lại',
                 () => {
-                    students.forEach(student => student.excluded = false);
+                    students.forEach(s => s.excluded = false);
                     renderGrid();
                     saveList();
-                    showAlert('Đã khởi động lại thành công!<br>Bây giờ tất cả học sinh đều tham gia quay.');
+                    showAlert('Đã khởi động lại!');
                 }
             );
         }
 
         function resetList() {
-            if (students.length === 0) {
-                showAlert('Danh sách đã trống rồi!');
-                return;
-            }
-
+            if (!students.length) return showAlert('Danh sách đã trống!');
             showConfirm(
-                '⚠️ Bạn có chắc chắn muốn XÓA TOÀN BỘ danh sách học sinh?<br><br>Hành động này <strong>KHÔNG THỂ</strong> hoàn tác!',
+                '⚠️ XÓA TOÀN BỘ danh sách?<br>Không thể khôi phục!',
                 'Xóa danh sách',
                 () => {
                     students = [];
-                    renderGrid();
                     localStorage.removeItem(STORAGE_KEY);
-
+                    renderGrid();
                     spinning = false;
-                    if (highlightInterval) {
-                        clearInterval(highlightInterval);
-                        highlightInterval = null;
-                    }
+                    if (highlightInterval) clearInterval(highlightInterval);
                     document.querySelectorAll('.student-item').forEach(el => el.classList.remove('highlight'));
-                    spinBtn.disabled = true;
-
                     updateButtons();
-                    showAlert('Đã xóa toàn bộ danh sách thành công!<br>Bây giờ bạn có thể thêm danh sách mới.');
+                    showAlert('Đã xóa toàn bộ danh sách!');
                 }
             );
         }
 
-        window.onload = function() {
+        window.onload = () => {
             loadSavedList();
             updateButtons();
         };
 
-        window.onclick = event => {
-            if (event.target === resultModal) closeModal();
-            if (event.target === alertModal) closeAlert();
+        window.onclick = e => {
+            if (e.target === resultModal) closeModal();
+            if (e.target === alertModal) closeAlert();
         };
     </script>
 </body>
