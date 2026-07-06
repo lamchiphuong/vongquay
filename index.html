@@ -64,6 +64,25 @@
             font-size: 16px;
         }
 
+        #student-list-input {
+            width: 100%;
+            max-width: 600px;
+            min-height: 130px;
+            padding: 15px 20px;
+            border: 2px solid #ddd;
+            border-radius: 20px;
+            font-size: 16px;
+            font-family: 'Poppins', sans-serif;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+
+        .textarea-hint {
+            font-size: 13px;
+            color: #888;
+            margin: -8px 0 15px;
+        }
+
         button.add-btn {
             padding: 12px 30px;
             background: #667eea;
@@ -78,6 +97,109 @@
 
         button.add-btn:hover {
             background: #5a6fd8;
+        }
+
+        .finish-btn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #26d0ce, #1a2980);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.3s;
+            margin-top: 15px;
+        }
+
+        .finish-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(26, 41, 128, 0.4);
+        }
+
+        .pending-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .pending-item {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 16px;
+            padding: 12px;
+            width: 130px;
+            text-align: center;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+        }
+
+        .pending-item .pending-photo,
+        .pending-item .pending-text-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            margin: 0 auto 8px;
+            border: 3px solid #eee;
+        }
+
+        .pending-item .pending-photo {
+            object-fit: cover;
+        }
+
+        .pending-item .pending-text-avatar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: 700;
+            color: white;
+            text-transform: uppercase;
+        }
+
+        .pending-item .pending-name {
+            font-weight: 600;
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 8px;
+            word-break: break-word;
+        }
+
+        .pending-actions {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-photo {
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .btn-photo:hover {
+            background: #5a6fd8;
+        }
+
+        .btn-remove-pending {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 12px;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .btn-remove-pending:hover {
+            background: #c0392b;
         }
 
         .student-grid {
@@ -364,11 +486,13 @@
         </header>
 
         <div class="add-section">
-            <div class="input-group">
-                <input type="text" id="student-name" placeholder="Nhập tên học sinh">
-                <input type="file" id="student-photo" accept="image/*">
-            </div>
-            <button class="add-btn" onclick="addStudent()">Thêm học sinh</button>
+            <textarea id="student-list-input" placeholder="Nhập danh sách học sinh, mỗi học sinh 1 dòng...&#10;Ví dụ:&#10;Nguyễn Văn A&#10;Trần Thị B&#10;Lê Văn C"></textarea>
+            <div class="textarea-hint">Mỗi học sinh xuống 1 hàng riêng</div>
+            <button class="add-btn" onclick="addStudentsFromList()">Thêm học sinh</button>
+
+            <div class="pending-list" id="pending-list"></div>
+
+            <button class="finish-btn" id="finish-add-btn" onclick="finishAdding()" style="display:none;">✅ Hoàn tất thêm (<span id="pending-count">0</span>)</button>
         </div>
 
         <div class="student-grid" id="student-grid"></div>
@@ -419,8 +543,12 @@
         const resetBtn = document.getElementById('reset-btn');
         const spinMusic = document.getElementById('spin-music');
         const winSound = document.getElementById('win-sound');
+        const pendingListEl = document.getElementById('pending-list');
+        const finishAddBtn = document.getElementById('finish-add-btn');
+        const pendingCountEl = document.getElementById('pending-count');
 
         let students = [];
+        let pendingStudents = [];
         let spinning = false;
         let lastWinnerIndex = -1;
         let highlightInterval = null;
@@ -505,53 +633,110 @@
             spinBtn.disabled = !hasActive || spinning;
         }
 
-        function addStudent() {
-            const nameInput = document.getElementById('student-name');
-            const photoInput = document.getElementById('student-photo');
-            const name = nameInput.value.trim();
+        function addStudentsFromList() {
+            const listInput = document.getElementById('student-list-input');
+            const rawText = listInput.value;
+            const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-            if (!name) {
-                showAlert('Vui lòng nhập tên học sinh!');
+            if (lines.length === 0) {
+                showAlert('Vui lòng nhập ít nhất 1 tên học sinh!');
                 return;
             }
 
-            if (students.some(s => s.name === name)) {
-                showAlert('Tên này đã tồn tại!');
-                nameInput.focus();
-                return;
-            }
+            let addedCount = 0;
+            let skippedCount = 0;
 
-            const resetInputs = () => {
-                nameInput.value = '';
-                photoInput.value = '';
-                nameInput.focus();
-            };
-
-            const add = (photoDataURL = null) => {
-                students.push({ name, photo: photoDataURL, excluded: false });
-                renderGrid();
-                saveList();
-                updateButtons();
-                resetInputs();
-            };
-
-            try {
-                if (photoInput.files && photoInput.files.length > 0) {
-                    const reader = new FileReader();
-                    reader.onload = (e) => add(e.target.result);
-                    reader.onerror = () => {
-                        showAlert("Không đọc được ảnh, vẫn thêm học sinh.");
-                        add(null);
-                    };
-                    reader.readAsDataURL(photoInput.files[0]);
-                } else {
-                    add(null);
+            lines.forEach(name => {
+                const existsInMain = students.some(s => s.name === name);
+                const existsInPending = pendingStudents.some(s => s.name === name);
+                if (existsInMain || existsInPending) {
+                    skippedCount++;
+                    return;
                 }
-            } catch (err) {
-                console.error("Lỗi thêm:", err);
-                showAlert("Có lỗi khi thêm, thử lại nhé!");
-                resetInputs();
+                pendingStudents.push({ name, photo: null, excluded: false });
+                addedCount++;
+            });
+
+            listInput.value = '';
+            renderPendingList();
+
+            if (skippedCount > 0) {
+                showAlert(`Đã thêm ${addedCount} học sinh vào danh sách chờ.\n${skippedCount} tên bị trùng nên đã bỏ qua.`);
             }
+        }
+
+        function renderPendingList() {
+            pendingListEl.innerHTML = '';
+
+            pendingStudents.forEach((student, idx) => {
+                const item = document.createElement('div');
+                item.className = 'pending-item';
+
+                let avatarHTML = student.photo
+                    ? `<img class="pending-photo" src="${student.photo}" alt="${student.name}">`
+                    : `<div class="pending-text-avatar" style="background-color:${getAvatarColor(student.name)}">${getInitial(student.name)}</div>`;
+
+                item.innerHTML = `
+                    ${avatarHTML}
+                    <div class="pending-name">${student.name}</div>
+                    <div class="pending-actions">
+                        <label class="btn-photo" onclick="triggerPendingPhoto(${idx})">🖼️ Thêm hình</label>
+                        <button class="btn-remove-pending" onclick="removePending(${idx})">✖</button>
+                    </div>
+                    <input type="file" accept="image/*" style="display:none" id="pending-photo-input-${idx}" onchange="handlePendingPhoto(${idx}, this.files)">
+                `;
+                pendingListEl.appendChild(item);
+            });
+
+            finishAddBtn.style.display = pendingStudents.length > 0 ? 'inline-block' : 'none';
+            pendingCountEl.textContent = pendingStudents.length;
+        }
+
+        function triggerPendingPhoto(idx) {
+            const input = document.getElementById(`pending-photo-input-${idx}`);
+            if (input) input.click();
+        }
+
+        function handlePendingPhoto(idx, files) {
+            if (!files || files.length === 0) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (pendingStudents[idx]) {
+                    pendingStudents[idx].photo = e.target.result;
+                    renderPendingList();
+                }
+            };
+            reader.onerror = () => {
+                showAlert('Không đọc được ảnh, thử lại nhé!');
+            };
+            reader.readAsDataURL(files[0]);
+        }
+
+        function removePending(idx) {
+            pendingStudents.splice(idx, 1);
+            renderPendingList();
+        }
+
+        function finishAdding() {
+            if (pendingStudents.length === 0) {
+                showAlert('Danh sách chờ đang trống!');
+                return;
+            }
+
+            let addedCount = 0;
+            pendingStudents.forEach(student => {
+                if (!students.some(s => s.name === student.name)) {
+                    students.push(student);
+                    addedCount++;
+                }
+            });
+
+            pendingStudents = [];
+            renderPendingList();
+            renderGrid();
+            saveList();
+            updateButtons();
+            showAlert(`Đã hoàn tất thêm ${addedCount} học sinh vào vòng quay!`);
         }
 
         function getActiveStudents() {
